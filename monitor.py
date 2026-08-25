@@ -22,6 +22,36 @@ def get_now_msk_str() -> str:
     """Returns current Moscow time formatted as HH:MM:SS."""
     return get_now_msk().strftime("%H:%M:%S")
 
+async def safe_send_alert_message(bot: Bot, user_id: int, msg: str, disable_preview: bool = True):
+    """Sends Telegram message with automatic handling for flood limits and blocked users cleanup."""
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=msg,
+            parse_mode="HTML",
+            disable_web_page_preview=disable_preview
+        )
+    except TelegramRetryAfter as err:
+        logger.warning(f"Flood limit sending alert to user {user_id}. Waiting {err.retry_after}s...")
+        await asyncio.sleep(err.retry_after + 1)
+        try:
+            await bot.send_message(
+                chat_id=user_id,
+                text=msg,
+                parse_mode="HTML",
+                disable_web_page_preview=disable_preview
+            )
+        except Exception:
+            pass
+    except Exception as err:
+        err_str = str(err).lower()
+        if "forbidden" in err_str or "blocked" in err_str or "deactivated" in err_str or "chat not found" in err_str:
+            logger.info(f"User {user_id} blocked bot or chat not found. Cleaning up from subscriptions...")
+            await db.remove_user_completely(user_id)
+        else:
+            logger.warning(f"Failed to send alert to user {user_id}: {err}")
+
+
 # Set to keep track of sent dungeon alerts to prevent duplicate sends
 sent_dungeon_alerts = set()
 
@@ -57,12 +87,7 @@ async def check_and_send_dungeon_alerts(bot: Bot):
                     f"⏰ Время МСК: <b>{now_str}</b>"
                 )
                 for user_id in subscribers:
-                    try:
-                        await bot.send_message(chat_id=user_id, text=msg, parse_mode="HTML")
-                    except TelegramRetryAfter as err:
-                        await asyncio.sleep(err.retry_after + 1)
-                    except Exception as err:
-                        logger.warning(f"Error sending dungeon_hard alert to user {user_id}: {err}")
+                    await safe_send_alert_message(bot, user_id, msg)
 
     # 2. Medium Dungeon Alert (Alert at :13 and :43 - 2 min before :15 and :45)
     if minute in (13, 43):
@@ -84,12 +109,7 @@ async def check_and_send_dungeon_alerts(bot: Bot):
                     f"⏰ Время МСК: <b>{now_str}</b>"
                 )
                 for user_id in subscribers:
-                    try:
-                        await bot.send_message(chat_id=user_id, text=msg, parse_mode="HTML")
-                    except TelegramRetryAfter as err:
-                        await asyncio.sleep(err.retry_after + 1)
-                    except Exception as err:
-                        logger.warning(f"Error sending dungeon_medium alert to user {user_id}: {err}")
+                    await safe_send_alert_message(bot, user_id, msg)
 
     # 3. Jeju Island Raid Alert (Alert at 16:58 MSK - 2 min before 17:00 MSK)
     if hour == 16 and minute == 58:
@@ -109,12 +129,7 @@ async def check_and_send_dungeon_alerts(bot: Bot):
                     f"⏰ Время МСК: <b>{now_str}</b>"
                 )
                 for user_id in subscribers:
-                    try:
-                        await bot.send_message(chat_id=user_id, text=msg, parse_mode="HTML")
-                    except TelegramRetryAfter as err:
-                        await asyncio.sleep(err.retry_after + 1)
-                    except Exception as err:
-                        logger.warning(f"Error sending dungeon_jeju alert to user {user_id}: {err}")
+                    await safe_send_alert_message(bot, user_id, msg)
 
     # 4. Dark Auction Alert (Alert on Saturday at 18:50 MSK - 10 min before 19:00 MSK)
     if now.weekday() == 5 and hour == 18 and minute == 50:
@@ -134,12 +149,7 @@ async def check_and_send_dungeon_alerts(bot: Bot):
                     f"⏰ Время МСК: <b>{now_str}</b>"
                 )
                 for user_id in subscribers:
-                    try:
-                        await bot.send_message(chat_id=user_id, text=msg, parse_mode="HTML")
-                    except TelegramRetryAfter as err:
-                        await asyncio.sleep(err.retry_after + 1)
-                    except Exception as err:
-                        logger.warning(f"Error sending dark_auction alert to user {user_id}: {err}")
+                    await safe_send_alert_message(bot, user_id, msg)
 
     # 5. Clan Raid Voice Alert (Alert 5 min before start) - Discord voice ONLY
     sound_clan_enabled = await db.get_discord_setting("sound_clan_raid", 1)
@@ -235,18 +245,7 @@ async def start_monitoring(bot: Bot):
 
                         if alert_msg:
                             for user_id in subscribers:
-                                try:
-                                    await bot.send_message(
-                                        chat_id=user_id,
-                                        text=alert_msg,
-                                        parse_mode="HTML",
-                                        disable_web_page_preview=False
-                                    )
-                                except TelegramRetryAfter as err:
-                                    logger.warning(f"Flood limit sending alert to user {user_id}. Waiting {err.retry_after}s...")
-                                    await asyncio.sleep(err.retry_after + 1)
-                                except Exception as err:
-                                    logger.warning(f"Failed to send alert to user {user_id}: {err}")
+                                await safe_send_alert_message(bot, user_id, alert_msg, disable_preview=False)
 
                 # Save updated state
                 await db.update_player_last_state(nick, current_state, info['is_online'])

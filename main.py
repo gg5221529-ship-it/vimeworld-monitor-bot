@@ -40,6 +40,8 @@ async def main():
     discord_task = asyncio.create_task(discord_bot.start_discord_bot())
 
     try:
+        logger.info("Clearing active webhooks and pending updates...")
+        await bot.delete_webhook(drop_pending_updates=True)
         logger.info("Starting Telegram bot polling...")
         await dp.start_polling(bot)
     finally:

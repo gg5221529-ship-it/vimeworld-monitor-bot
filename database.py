@@ -103,6 +103,14 @@ async def unsubscribe_user(user_id: int, sub_key: str):
         )
         await db.commit()
 
+async def remove_user_completely(user_id: int):
+    """Removes user and all their subscriptions when bot is blocked."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM subscriptions WHERE user_id = ?", (user_id,))
+        await db.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+        await db.commit()
+    logger.info(f"Cleaned up blocked/deactivated user {user_id} from database.")
+
 async def get_all_subscribers_for_key(sub_key: str) -> list:
     """Gets all user_ids subscribed to a sub_key."""
     async with aiosqlite.connect(DB_PATH) as db:
