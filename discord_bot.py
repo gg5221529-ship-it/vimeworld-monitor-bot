@@ -892,11 +892,10 @@ def generate_admin_embed(settings: dict) -> discord.Embed:
     embed.add_field(name="⚔️ Среднее подземелье", value="🟢 Включено" if settings.get("sound_dungeon_medium", 1) else "🔴 Выключено", inline=True)
     embed.add_field(name="🌋 Остров Чеджу (17:00)", value="🟢 Включено" if settings.get("sound_dungeon_jeju", 1) else "🔴 Выключено", inline=True)
     embed.add_field(name="🏛 Тёмный Аукцион (Сб 19:00)", value="🟢 Включено" if settings.get("sound_dark_auction", 1) else "🔴 Выключено", inline=True)
-    embed.add_field(name="🏰 Клановый рейд (голос)", value="🟢 Включено" if settings.get("sound_clan_raid", 1) else "🔴 Выключено", inline=True)
-    embed.add_field(name="🔄 Режим рестарта клана", value="🟢 Сброс в 03:00 (04:15...)" if settings.get("clan_restart_mode", 1) else "🔴 Непрерывный (+1:15)", inline=True)
+    embed.add_field(name="🏰 Клановый рейд (голос)", value="🟢 Включено (каждый час :00)" if settings.get("sound_clan_raid", 1) else "🔴 Выключено", inline=True)
     embed.add_field(name="🎬 Лололошка", value="🟢 Включено" if settings.get("sound_MrLalalashkaXXL", 1) else "🔴 Выключено", inline=True)
     embed.add_field(name="🎮 Фиксплей", value="🟢 Включено" if settings.get("sound_F1xPlay_", 1) else "🔴 Выключено", inline=True)
-    embed.set_footer(text="Нажимайте на кнопки ниже для переключения статуса")
+    embed.set_footer(text="Интервал кланового рейда: каждый час в :00 (голос за 5 мин в :55)")
     return embed
 
 
@@ -967,23 +966,19 @@ if tree:
         embed = build_compare_embed(p1, p2)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @tree.command(name="clan", description="Расписание клановых рейдов Solo Leveling (интервал 1ч 15м)")
+    @tree.command(name="clan", description="Расписание клановых рейдов Solo Leveling (каждый час)")
     async def slash_clan(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        restart_mode = bool(await db.get_discord_setting("clan_restart_mode", 1))
         now = dungeon_utils.get_now_msk()
-        clan_raid = dungeon_utils.get_next_clan_raid(now, restart_mode=restart_mode)
-        
-        today_raids = dungeon_utils.get_clan_raids_for_date(now.date(), restart_mode=restart_mode)
-        
-        mode_text = "🔄 **Сброс в 03:00** (ежедневно: 04:15, 05:30, 06:45...)" if restart_mode else "⏳ **Непрерывный таймер** (+1:15 сквозь рестарт)"
+        clan_raid = dungeon_utils.get_next_clan_raid(now)
+        today_raids = dungeon_utils.get_clan_raids_for_date(now.date())
         
         embed = discord.Embed(
             title="🏰 Расписание Клановых Рейдов Solo Leveling",
             description=(
                 f"🕒 **Ближайший рейд:** `{clan_raid['formatted_time']}` (через **{clan_raid['time_remaining']}**)\n"
                 f"🔊 **Голосовой анонс:** за 5 минут до старта в `{clan_raid['alert_formatted']}`\n\n"
-                f"⚙️ **Режим расчета:** {mode_text}"
+                f"⚙️ **Расписание:** Каждый час в **:00** (с 03:00 до 03:00 ежедневно)"
             ),
             color=0x9B59B6
         )
@@ -1004,7 +999,7 @@ if tree:
             value="\n".join(schedule_lines) if schedule_lines else "Нет рейдов",
             inline=False
         )
-        embed.set_footer(text="Интервал: 1ч 15м (75 мин) | Переключение режима доступно в /admin")
+        embed.set_footer(text="Интервал: каждый час в :00 | Голосовой анонс за 5 минут до старта (:55)")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
 async def play_voice_sound(sound_filename: str) -> tuple[bool, str]:

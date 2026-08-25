@@ -151,17 +151,13 @@ async def check_and_send_dungeon_alerts(bot: Bot):
                 for user_id in subscribers:
                     await safe_send_alert_message(bot, user_id, msg)
 
-    # 5. Clan Raid Voice Alert (Alert 5 min before start) - Discord voice ONLY
+    # 5. Clan Raid Voice Alert (Alert 5 min before start at :55 of each hour) - Discord voice ONLY
     sound_clan_enabled = await db.get_discord_setting("sound_clan_raid", 1)
-    if sound_clan_enabled:
-        restart_mode = bool(await db.get_discord_setting("clan_restart_mode", 1))
-        clan_raid = dungeon_utils.get_next_clan_raid(now, restart_mode=restart_mode)
-        alert_dt = clan_raid["alert_dt"]
-        if now.date() == alert_dt.date() and now.hour == alert_dt.hour and now.minute == alert_dt.minute:
-            alert_key = ("clan_raid", alert_dt.date(), alert_dt.hour, alert_dt.minute)
-            if alert_key not in sent_dungeon_alerts:
-                sent_dungeon_alerts.add(alert_key)
-                asyncio.create_task(discord_bot.play_voice_sound("clan.mp3"))
+    if sound_clan_enabled and minute == 55:
+        alert_key = ("clan_raid", now.date(), hour, minute)
+        if alert_key not in sent_dungeon_alerts:
+            sent_dungeon_alerts.add(alert_key)
+            asyncio.create_task(discord_bot.play_voice_sound("clan.mp3"))
 
     # Clean old alert keys periodically
     if len(sent_dungeon_alerts) > 50:
