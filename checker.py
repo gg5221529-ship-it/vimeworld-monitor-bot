@@ -72,10 +72,11 @@ async def fetch_player_status(nickname: str) -> dict:
         "url": f"https://vimeworld.com/player/{nickname}"
     }
 
+    session_success = False
     async with aiohttp.ClientSession() as session:
         try:
             # 1. Fetch real-time session status
-            async with session.get(SESSION_API_URL.format(nickname=nickname), timeout=5) as resp:
+            async with session.get(SESSION_API_URL.format(nickname=nickname), timeout=6) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     online_data = data.get("online", {})
@@ -97,12 +98,19 @@ async def fetch_player_status(nickname: str) -> dict:
                             default_result["state"] = "OTHER_GAME"
                             default_result["game_mode"] = message or game
                             default_result["status_display"] = f"🔵 Играет в {message or game}"
+                    else:
+                        default_result["state"] = "OFFLINE"
+                    session_success = True
+                else:
+                    logger.warning(f"VimeWorld API session endpoint returned status {resp.status} for {nickname}")
         except Exception as e:
             logger.warning(f"Error fetching session for {nickname}: {e}")
 
+        default_result["fetch_failed"] = not session_success
+
         try:
             # 2. Fetch basic profile data (level, donator rank)
-            async with session.get(PROFILE_API_URL.format(nickname=nickname), timeout=5) as resp:
+            async with session.get(PROFILE_API_URL.format(nickname=nickname), timeout=6) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     if isinstance(data, list) and len(data) > 0:

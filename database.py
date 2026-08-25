@@ -9,7 +9,9 @@ DB_PATH = os.path.join("data", "bot_database.db")
 async def init_db():
     """Initializes SQLite database and creates tables if not present."""
     os.makedirs("data", exist_ok=True)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=15) as db:
+        await db.execute("PRAGMA journal_mode=WAL;")
+        await db.execute("PRAGMA busy_timeout=5000;")
         # Users table
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (

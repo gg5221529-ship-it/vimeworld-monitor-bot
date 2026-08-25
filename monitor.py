@@ -163,14 +163,21 @@ async def check_and_send_dungeon_alerts(bot: Bot):
     if len(sent_dungeon_alerts) > 50:
         sent_dungeon_alerts.clear()
 
+# Debounce tracking for offline state confirmation (prevents false alerts on hub teleportation / API blips)
+# 8 checks * 2s interval = ~16 seconds of sustained offline before declaring OFFLINE
+REQUIRED_OFFLINE_CHECKS = 8
+offline_streak_counts = {}
+
 async def start_monitoring(bot: Bot):
     """
-    Background worker loop that checks YouTuber online status and Dungeon/Raid timers every 2s.
+    Main background loop that:
+    1. Checks YouTuber online status every 2 seconds with Debounce (Anti-Flapping).
+    2. Checks upcoming dungeons/raids and triggers 2-min reminders & Discord voice alerts.
     """
-    logger.info(f"Starting background monitoring loop (check interval: {CHECK_INTERVAL}s)...")
+    logger.info(f"Starting background monitoring loop (check interval: {CHECK_INTERVAL}s, offline debounce: {REQUIRED_OFFLINE_CHECKS * CHECK_INTERVAL}s)...")
     
-    # Initialize status ONLY if player state does not exist in DB yet
-    for nick in YOUTUBERS.keys():
+    # Initialize initial state on startup to prevent false notifications
+    for nick in YOUTUBERS:
         try:
             state_exists = await db.has_player_state(nick)
             if not state_exists:
@@ -193,58 +200,87 @@ async def start_monitoring(bot: Bot):
             # Check YouTuber online states
             for nick, data in YOUTUBERS.items():
                 info = await checker.fetch_player_status(nick)
+                
+                # If API call failed/timed out, skip this cycle to avoid false offline alerts
+                if info.get("fetch_failed"):
+                    continue
+
                 current_state = info['state']
                 prev_state = await db.get_player_last_state(nick)
-                
-                # Check for state transition
-                if current_state != prev_state:
-                    logger.info(f"⚡ State change for {data['name']} ({nick}): {prev_state} ➔ {current_state}")
+
+                # 1. Player is Online (SOLOLEVELING, LOBBY, OTHER_GAME)
+                if current_state != "OFFLINE":
+                    offline_streak_counts[nick] = 0
                     
-                    # Play Discord Voice Audio if YouTuber enters Solo Leveling
-                    if current_state == "SOLOLEVELING" and "sound" in data:
-                        asyncio.create_task(discord_bot.play_voice_sound(data["sound"]))
-
-                    subscribers = await db.get_subscribers_for_player(nick)
-                    if subscribers:
-                        now_str = get_now_msk_str()
-                        alert_msg = None
+                    if current_state != prev_state:
+                        logger.info(f"⚡ State change for {data['name']} ({nick}): {prev_state} ➔ {current_state}")
                         
-                        # 1. Entered Solo Leveling
-                        if current_state == "SOLOLEVELING":
-                            alert_msg = (
-                                f"🚨 <b>{data['icon']} {data['name'].upper()} ЗАШЁЛ НА SOLO LEVELING!</b> 🚨\n\n"
-                                f"🎮 <b>{data['name']}</b> (<code>{nick}</code>) зашёл в режим <b>Solo Leveling</b> на VimeWorld!\n"
-                                f"⏰ Время (МСК): <b>{now_str}</b>\n\n"
-                                f"🔗 <a href='{data['url']}'>Перейти на профиль VimeWorld</a>"
-                            )
-                        # 2. Left server (Offline)
-                        elif current_state == "OFFLINE":
-                            alert_msg = (
-                                f"🔴 <b>{data['icon']} {data['name'].upper()} ВЫШЕЛ С СЕРВЕРА</b>\n\n"
-                                f"🎮 <b>{data['name']}</b> (<code>{nick}</code>) вышел с сервера VimeWorld.\n"
-                                f"⏰ Время выхода (МСК): <b>{now_str}</b>"
-                            )
-                        # 3. Left Solo Leveling / Returned to Lobby
-                        elif prev_state == "SOLOLEVELING" and current_state in ("LOBBY", "OTHER_GAME"):
-                            alert_msg = (
-                                f"🟡 <b>{data['icon']} {data['name'].upper()} ВЫШЕЛ С SOLO LEVELING В ЛОББИ</b>\n\n"
-                                f"🎮 <b>{data['name']}</b> (<code>{nick}</code>) вышел с Solo Leveling в лобби (или сменил режим).\n"
-                                f"⏰ Время (МСК): <b>{now_str}</b>"
-                            )
-                        # 4. Connected to server (In Lobby)
-                        elif prev_state == "OFFLINE" and current_state in ("LOBBY", "OTHER_GAME"):
-                            alert_msg = (
-                                f"🟡 <b>{data['icon']} {data['name'].upper()} ЗАШЁЛ НА СЕРВЕР (В ЛОББИ)</b>\n\n"
-                                f"🎮 <b>{data['name']}</b> (<code>{nick}</code>) зашёл на VimeWorld (сейчас в лобби).\n"
-                                f"⏰ Время входа (МСК): <b>{now_str}</b>"
-                            )
+                        # Play Discord Voice Audio if YouTuber enters Solo Leveling
+                        if current_state == "SOLOLEVELING" and "sound" in data:
+                            asyncio.create_task(discord_bot.play_voice_sound(data["sound"]))
 
-                        if alert_msg:
-                            for user_id in subscribers:
-                                await safe_send_alert_message(bot, user_id, alert_msg, disable_preview=False)
+                        subscribers = await db.get_subscribers_for_player(nick)
+                        if subscribers:
+                            now_str = get_now_msk_str()
+                            alert_msg = None
+                            
+                            # A. Entered Solo Leveling
+                            if current_state == "SOLOLEVELING":
+                                alert_msg = (
+                                    f"🚨 <b>{data['icon']} {data['name'].upper()} ЗАШЁЛ НА SOLO LEVELING!</b> 🚨\n\n"
+                                    f"🎮 <b>{data['name']}</b> (<code>{nick}</code>) зашёл в режим <b>Solo Leveling</b> на VimeWorld!\n"
+                                    f"⏰ Время (МСК): <b>{now_str}</b>\n\n"
+                                    f"🔗 <a href='{data['url']}'>Перейти на профиль VimeWorld</a>"
+                                )
+                            # B. Left Solo Leveling / Returned to Lobby
+                            elif prev_state == "SOLOLEVELING" and current_state in ("LOBBY", "OTHER_GAME"):
+                                alert_msg = (
+                                    f"🟡 <b>{data['icon']} {data['name'].upper()} ВЫШЕЛ С SOLO LEVELING В ЛОББИ</b>\n\n"
+                                    f"🎮 <b>{data['name']}</b> (<code>{nick}</code>) вышел с Solo Leveling в лобби (или сменил режим).\n"
+                                    f"⏰ Время (МСК): <b>{now_str}</b>"
+                                )
+                            # C. Connected to server (In Lobby) from OFFLINE
+                            elif prev_state == "OFFLINE" and current_state in ("LOBBY", "OTHER_GAME"):
+                                alert_msg = (
+                                    f"🟡 <b>{data['icon']} {data['name'].upper()} ЗАШЁЛ НА СЕРВЕР (В ЛОББИ)</b>\n\n"
+                                    f"🎮 <b>{data['name']}</b> (<code>{nick}</code>) зашёл на VimeWorld (сейчас в лобби).\n"
+                                    f"⏰ Время входа (МСК): <b>{now_str}</b>"
+                                )
 
-                # Save updated state
-                await db.update_player_last_state(nick, current_state, info['is_online'])
+                            if alert_msg:
+                                for user_id in subscribers:
+                                    await safe_send_alert_message(bot, user_id, alert_msg, disable_preview=False)
+
+                        # Save updated online state immediately
+                        await db.update_player_last_state(nick, current_state, info['is_online'])
+
+                # 2. Player detected OFFLINE (Apply Debounce)
+                else:
+                    if prev_state == "OFFLINE":
+                        offline_streak_counts[nick] = 0
+                    else:
+                        # Increment offline streak count for debounce
+                        streak = offline_streak_counts.get(nick, 0) + 1
+                        offline_streak_counts[nick] = streak
+                        
+                        if streak >= REQUIRED_OFFLINE_CHECKS:
+                            # Confirmed offline after 16 seconds of continuous offline!
+                            logger.info(f"⚡ Confirmed OFFLINE for {data['name']} ({nick}): {prev_state} ➔ OFFLINE (confirmed after {streak * CHECK_INTERVAL}s)")
+                            offline_streak_counts[nick] = 0
+                            
+                            subscribers = await db.get_subscribers_for_player(nick)
+                            if subscribers:
+                                now_str = get_now_msk_str()
+                                alert_msg = (
+                                    f"🔴 <b>{data['icon']} {data['name'].upper()} ВЫШЕЛ С СЕРВЕРА</b>\n\n"
+                                    f"🎮 <b>{data['name']}</b> (<code>{nick}</code>) вышел с сервера VimeWorld.\n"
+                                    f"⏰ Время выхода (МСК): <b>{now_str}</b>"
+                                )
+                                for user_id in subscribers:
+                                    await safe_send_alert_message(bot, user_id, alert_msg, disable_preview=False)
+
+                            # Save confirmed OFFLINE state
+                            await db.update_player_last_state(nick, "OFFLINE", False)
                 
         except asyncio.CancelledError:
             logger.info("Monitoring loop cancelled.")
