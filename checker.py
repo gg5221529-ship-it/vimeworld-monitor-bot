@@ -56,9 +56,12 @@ def format_big_number(val) -> str:
     except Exception:
         return str(val)
 
+STAFF_ONLINE_API_URL = "https://api.vimeworld.com/online/staff"
+
 async def fetch_player_status(nickname: str) -> dict:
     """
     Fetches real-time online status and session details for a nickname.
+    Includes Ghost-Session validation to detect stuck sessions on VimeWorld.
     States: OFFLINE, LOBBY, SOLOLEVELING, OTHER_GAME
     """
     default_result = {
@@ -83,6 +86,30 @@ async def fetch_player_status(nickname: str) -> dict:
                     is_online = online_data.get("value", False)
                     game = online_data.get("game", "")
                     message = online_data.get("message", "")
+                    user_data = data.get("user", {})
+                    last_seen = user_data.get("lastSeen", 0)
+                    user_rank = user_data.get("rank", "USER")
+
+                    # Ghost Session Filter: VimeWorld API can leave online.value=True for hours after disconnect
+                    import time
+                    now_ts = int(time.time())
+                    last_seen_diff = now_ts - last_seen if last_seen else 0
+
+                    if is_online and last_seen_diff > 300:
+                        # For YouTubers/Staff: verify with live /online/staff endpoint
+                        if user_rank in ("YOUTUBE", "YOUTUBER", "ADMIN", "CHIEF", "WARDEN", "MODER", "DEV"):
+                            try:
+                                async with session.get(STAFF_ONLINE_API_URL, timeout=4) as sresp:
+                                    if sresp.status == 200:
+                                        staff_data = await sresp.json()
+                                        staff_names = {s.get("username", "").lower() for s in staff_data}
+                                        if nickname.lower() not in staff_names:
+                                            logger.debug(f"Ghost session for {nickname} ignored (lastSeen: {last_seen_diff}s ago, not in /online/staff).")
+                                            is_online = False
+                            except Exception as se:
+                                logger.debug(f"Error checking /online/staff for {nickname}: {se}")
+                        elif last_seen_diff > 1800:
+                            is_online = False
 
                     default_result["is_online"] = is_online
                     if is_online:
