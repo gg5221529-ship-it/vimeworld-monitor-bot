@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8874409890:AAF10XCIfde3cGt2qHPT5vmZwmcPSJNjV8k")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8874409890:AAFjNij0a-4qDrzx9iAAdX18un6RmicGIn4")
 
 # Discord Bot Settings
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
