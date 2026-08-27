@@ -804,7 +804,17 @@ class DiscordAdminView(discord.ui.View):
         btn_med.callback = self.make_toggle_callback("sound_dungeon_medium")
         self.add_item(btn_med)
 
-        # 3. Jeju Raid
+        # 3. Double Dungeon
+        double_on = self.settings.get("sound_dungeon_double", 1)
+        btn_double = discord.ui.Button(
+            label=f"💀 Двойное: {'🟢 ВКЛ' if double_on else '🔴 ВЫКЛ'}",
+            style=discord.ButtonStyle.success if double_on else discord.ButtonStyle.danger,
+            custom_id="toggle_sound_dungeon_double"
+        )
+        btn_double.callback = self.make_toggle_callback("sound_dungeon_double")
+        self.add_item(btn_double)
+
+        # 4. Jeju Raid
         jeju_on = self.settings.get("sound_dungeon_jeju", 1)
         btn_jeju = discord.ui.Button(
             label=f"🌋 Чеджу: {'🟢 ВКЛ' if jeju_on else '🔴 ВЫКЛ'}",
@@ -814,7 +824,7 @@ class DiscordAdminView(discord.ui.View):
         btn_jeju.callback = self.make_toggle_callback("sound_dungeon_jeju")
         self.add_item(btn_jeju)
 
-        # 4. Dark Auction
+        # 5. Dark Auction
         auc_on = self.settings.get("sound_dark_auction", 1)
         btn_auc = discord.ui.Button(
             label=f"🏛 Аукцион: {'🟢 ВКЛ' if auc_on else '🔴 ВЫКЛ'}",
@@ -824,7 +834,7 @@ class DiscordAdminView(discord.ui.View):
         btn_auc.callback = self.make_toggle_callback("sound_dark_auction")
         self.add_item(btn_auc)
 
-        # 5. Clan Raid Voice
+        # 6. Clan Raid Voice
         clan_on = self.settings.get("sound_clan_raid", 1)
         btn_clan = discord.ui.Button(
             label=f"🏰 Клан Рейд: {'🟢 ВКЛ' if clan_on else '🔴 ВЫКЛ'}",
@@ -834,7 +844,7 @@ class DiscordAdminView(discord.ui.View):
         btn_clan.callback = self.make_toggle_callback("sound_clan_raid")
         self.add_item(btn_clan)
 
-        # 6. Clan Restart Mode (Reset at 03:00 vs Continuous)
+        # 7. Clan Restart Mode (Reset at 03:00 vs Continuous)
         restart_mode = self.settings.get("clan_restart_mode", 1)
         btn_restart = discord.ui.Button(
             label=f"🔄 Рестарт (03:00): {'🟢 СБРОС' if restart_mode else '🔴 НЕПРЕРЫВНО'}",
@@ -844,7 +854,7 @@ class DiscordAdminView(discord.ui.View):
         btn_restart.callback = self.make_toggle_callback("clan_restart_mode")
         self.add_item(btn_restart)
 
-        # 7. Lololoshka
+        # 8. Lololoshka
         lol_on = self.settings.get("sound_MrLalalashkaXXL", 1)
         btn_lol = discord.ui.Button(
             label=f"🎬 Лололошка: {'🟢 ВКЛ' if lol_on else '🔴 ВЫКЛ'}",
@@ -854,7 +864,7 @@ class DiscordAdminView(discord.ui.View):
         btn_lol.callback = self.make_toggle_callback("sound_MrLalalashkaXXL")
         self.add_item(btn_lol)
 
-        # 8. FixPlay
+        # 9. FixPlay
         fix_on = self.settings.get("sound_F1xPlay_", 1)
         btn_fix = discord.ui.Button(
             label=f"🎮 Фиксплей: {'🟢 ВКЛ' if fix_on else '🔴 ВЫКЛ'}",
@@ -890,12 +900,13 @@ def generate_admin_embed(settings: dict) -> discord.Embed:
     )
     embed.add_field(name="🗡 Сложное подземелье", value="🟢 Включено" if settings.get("sound_dungeon_hard", 1) else "🔴 Выключено", inline=True)
     embed.add_field(name="⚔️ Среднее подземелье", value="🟢 Включено" if settings.get("sound_dungeon_medium", 1) else "🔴 Выключено", inline=True)
+    embed.add_field(name="💀 Двойное подземелье", value="🟢 Включено (00, 06, 12, 18)" if settings.get("sound_dungeon_double", 1) else "🔴 Выключено", inline=True)
     embed.add_field(name="🌋 Остров Чеджу (17:00)", value="🟢 Включено" if settings.get("sound_dungeon_jeju", 1) else "🔴 Выключено", inline=True)
     embed.add_field(name="🏛 Тёмный Аукцион (Сб 19:00)", value="🟢 Включено" if settings.get("sound_dark_auction", 1) else "🔴 Выключено", inline=True)
     embed.add_field(name="🏰 Клановый рейд (голос)", value="🟢 Включено (каждый час :00)" if settings.get("sound_clan_raid", 1) else "🔴 Выключено", inline=True)
     embed.add_field(name="🎬 Лололошка", value="🟢 Включено" if settings.get("sound_MrLalalashkaXXL", 1) else "🔴 Выключено", inline=True)
     embed.add_field(name="🎮 Фиксплей", value="🟢 Включено" if settings.get("sound_F1xPlay_", 1) else "🔴 Выключено", inline=True)
-    embed.set_footer(text="Интервал кланового рейда: каждый час в :00 (голос за 5 мин в :55)")
+    embed.set_footer(text="Приоритет: в 00:00, 06:00, 12:00, 18:00 озвучивается Двойное вместо Клана")
     return embed
 
 

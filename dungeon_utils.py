@@ -63,6 +63,35 @@ def get_next_medium_dungeon(now: datetime = None) -> dict:
         "secs_left": secs_left,
     }
 
+def get_next_double_dungeon(now: datetime = None) -> dict:
+    """Calculates next Double Dungeon (00:00, 06:00, 12:00, 18:00 MSK)."""
+    now = now or get_now_msk()
+    hours = [0, 6, 12, 18]
+    candidates = [now.replace(hour=h, minute=0, second=0, microsecond=0) for h in hours]
+    # If all today passed, next is tomorrow at 00:00
+    candidates.append((now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0))
+    
+    upcoming = [c for c in candidates if c > now]
+    target = upcoming[0]
+
+    delta_sec = int((target - now).total_seconds())
+    hours_left = delta_sec // 3600
+    mins_left = (delta_sec % 3600) // 60
+
+    time_str = target.strftime("%H:%M")
+    date_str = "сегодня" if target.date() == now.date() else "завтра"
+
+    return {
+        "key": "dungeon_double",
+        "name": DUNGEONS["dungeon_double"]["name"],
+        "icon": DUNGEONS["dungeon_double"]["icon"],
+        "formatted_time": f"{time_str} МСК ({date_str})",
+        "total_seconds": delta_sec,
+        "hours_left": hours_left,
+        "mins_left": mins_left,
+        "time_remaining": f"{hours_left} ч {mins_left} мин" if hours_left > 0 else f"{mins_left} мин",
+    }
+
 def get_next_jeju_raid(now: datetime = None) -> dict:
     """Calculates next Jeju Island Raid (17:00 MSK)."""
     now = now or get_now_msk()
@@ -135,6 +164,7 @@ def generate_dungeon_schedule_text() -> str:
     """Generates user-friendly text for upcoming dungeons and raids schedule."""
     hard = get_next_hard_dungeon()
     medium = get_next_medium_dungeon()
+    double = get_next_double_dungeon()
     jeju = get_next_jeju_raid()
     auction = get_next_dark_auction()
     now_str = get_now_msk().strftime("%H:%M:%S")
@@ -145,11 +175,13 @@ def generate_dungeon_schedule_text() -> str:
         f"   🕒 Ближайшее: <b>{hard['formatted_time']}</b> (через <b>{hard['mins_left']} мин</b>)\n\n"
         f"2. {medium['icon']} <b>{medium['name']}</b> ({DUNGEONS['dungeon_medium']['schedule_desc']})\n"
         f"   🕒 Ближайшее: <b>{medium['formatted_time']}</b> (через <b>{medium['mins_left']} мин</b>)\n\n"
-        f"3. {jeju['icon']} <b>{jeju['name']}</b> ({DUNGEONS['dungeon_jeju']['schedule_desc']})\n"
+        f"3. {double['icon']} <b>{double['name']}</b> ({DUNGEONS['dungeon_double']['schedule_desc']})\n"
+        f"   🕒 Ближайшее: <b>{double['formatted_time']}</b> (через <b>{double['time_remaining']}</b>)\n\n"
+        f"4. {jeju['icon']} <b>{jeju['name']}</b> ({DUNGEONS['dungeon_jeju']['schedule_desc']})\n"
         f"   🕒 Ближайшее: <b>{jeju['formatted_time']}</b> (через <b>{jeju['hours_left']} ч {jeju['mins_left']} мин</b>)\n\n"
-        f"4. {auction['icon']} <b>{auction['name']}</b> ({DUNGEONS['dark_auction']['schedule_desc']})\n"
+        f"5. {auction['icon']} <b>{auction['name']}</b> ({DUNGEONS['dark_auction']['schedule_desc']})\n"
         f"   🕒 Ближайшее: <b>{auction['formatted_time']}</b> (через <b>{auction['time_remaining']}</b>)\n\n"
-        f"🔔 <i>Уведомления и голосовые анонсы приходят за 2 мин до подземелий/рейда и за 10 мин до Тёмного Аукциона!</i>\n"
+        f"🔔 <i>Уведомления и голосовые анонсы приходят за 2–5 мин до начала!</i>\n"
         f"🕒 <i>Текущее время (МСК): {now_str}</i>"
     )
     return text

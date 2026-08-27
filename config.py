@@ -49,6 +49,13 @@ DUNGEONS = {
         "alert_minutes": [13, 43],
         "sound": "dungeon_medium.mp3"
     },
+    "dungeon_double": {
+        "name": "Двойное подземелье",
+        "icon": "💀",
+        "schedule_desc": "в 00:00, 06:00, 12:00, 18:00 МСК",
+        "hours": [0, 6, 12, 18],
+        "sound": "double_dungeon.mp3"
+    },
     "dungeon_jeju": {
         "name": "Остров Чеджу (Рейд)",
         "icon": "🌋",

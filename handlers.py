@@ -116,15 +116,16 @@ async def generate_monitoring_text(user_id: int) -> str:
     fix_active = "F1xPlay_" in subs
     hard_active = "dungeon_hard" in subs
     med_active = "dungeon_medium" in subs
+    double_active = "dungeon_double" in subs
     jeju_active = "dungeon_jeju" in subs
     auc_active = "dark_auction" in subs
 
-    total_subs_count = sum([lol_active, fix_active, hard_active, med_active, jeju_active, auc_active])
+    total_subs_count = sum([lol_active, fix_active, hard_active, med_active, double_active, jeju_active, auc_active])
     
-    if total_subs_count == 6:
-        overall_status = "🟢 <b>Все уведомления ВКЛЮЧЕНЫ</b> (Ютуберы + Подземелья + Чеджу + Аукцион)"
+    if total_subs_count == 7:
+        overall_status = "🟢 <b>Все уведомления ВКЛЮЧЕНЫ</b> (Ютуберы + Данжи + Двойное + Чеджу + Аукцион)"
     elif total_subs_count > 0:
-        overall_status = f"🟡 <b>Уведомления ВКЛЮЧЕНЫ частично</b> ({total_subs_count} из 6 типов)"
+        overall_status = f"🟡 <b>Уведомления ВКЛЮЧЕНЫ частично</b> ({total_subs_count} из 7 типов)"
     else:
         overall_status = "🔴 <b>Уведомления ВЫКЛЮЧЕНЫ</b>"
 
@@ -135,6 +136,7 @@ async def generate_monitoring_text(user_id: int) -> str:
         "• 🎬/🎮 <b>Ютуберы:</b> статус онлайна и входа на Solo Leveling\n"
         "• 🗡 <b>Сложное подземелье:</b> каждые :10 и :40 мин (увед за 2 мин)\n"
         "• ⚔️ <b>Среднее подземелье:</b> каждые :15 и :45 мин (увед за 2 мин)\n"
+        "• 💀 <b>Двойное подземелье:</b> в 00:00, 06:00, 12:00, 18:00 МСК (увед за 2 мин)\n"
         "• 🌋 <b>Остров Чеджу (Рейд):</b> в 17:00 МСК (увед в 16:58)\n"
         "• 🏛 <b>Тёмный Аукцион:</b> каждую субботу в 19:00 МСК (увед в 18:50)\n\n"
         "Нажимай на кнопки ниже, чтобы включать или выключать нужные уведомления:"
@@ -151,6 +153,7 @@ async def generate_admin_stats_text() -> str:
     fix_count = breakdown.get("F1xPlay_", 0)
     hard_count = breakdown.get("dungeon_hard", 0)
     med_count = breakdown.get("dungeon_medium", 0)
+    double_count = breakdown.get("dungeon_double", 0)
     jeju_count = breakdown.get("dungeon_jeju", 0)
     auc_count = breakdown.get("dark_auction", 0)
     
@@ -161,9 +164,8 @@ async def generate_admin_stats_text() -> str:
         "👑 <b>Панель Администратора</b>\n\n"
         f"📊 <b>Статистика бота:</b>\n"
         f"👥 Пользователей в базе: <code>{total_users}</code> | 🔔 Активных подписчиков: <code>{active_subs}</code>\n\n"
-        f"<b>Подписки:</b>\n"
-        f"• 🎬 Лололошка: <b>{lol_count}</b> | 🎮 Фиксплей: <b>{fix_count}</b>\n"
-        f"• 🗡 Сложное: <b>{hard_count}</b> | ⚔️ Среднее: <b>{med_count}</b> | 🌋 Чеджу: <b>{jeju_count}</b> | 🏛 Аукцион: <b>{auc_count}</b>\n\n"
+        f"• 🗡 Сложное: <b>{hard_count}</b> | ⚔️ Среднее: <b>{med_count}</b> | 💀 Двойное: <b>{double_count}</b>\n"
+        f"• 🌋 Чеджу: <b>{jeju_count}</b> | 🏛 Аукцион: <b>{auc_count}</b>\n\n"
         f"<b>Статус Discord Voice:</b>\n{discord_info}\n\n"
         f"⏱ <i>Интервал проверки: 2 сек | Отчет (МСК): {now_str}</i>"
     )
@@ -386,7 +388,7 @@ async def cb_test_sound(callback: CallbackQuery):
         pass
 
 # Callback handlers for monitoring inline keyboard
-ALL_KEYS = ["MrLalalashkaXXL", "F1xPlay_", "dungeon_hard", "dungeon_medium", "dungeon_jeju", "dark_auction"]
+ALL_KEYS = ["MrLalalashkaXXL", "F1xPlay_", "dungeon_hard", "dungeon_medium", "dungeon_double", "dungeon_jeju", "dark_auction"]
 
 @router.callback_query(F.data.startswith("toggle_"))
 async def cb_toggle(callback: CallbackQuery):

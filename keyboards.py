@@ -39,6 +39,7 @@ async def get_monitoring_inline_keyboard(user_id: int) -> InlineKeyboardMarkup:
     fix_sub = "F1xPlay_" in subs
     hard_sub = "dungeon_hard" in subs
     med_sub = "dungeon_medium" in subs
+    double_sub = "dungeon_double" in subs
     jeju_sub = "dungeon_jeju" in subs
     auc_sub = "dark_auction" in subs
 
@@ -67,6 +68,12 @@ async def get_monitoring_inline_keyboard(user_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text=f"⚔️ Среднее (:15, :45): {'🟢 Включен' if med_sub else '🔴 Выключен'}",
                 callback_data="toggle_dungeon_medium"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=f"💀 Двойное (00, 06, 12, 18): {'🟢 Включен' if double_sub else '🔴 Выключен'}",
+                callback_data="toggle_dungeon_double"
             )
         ],
         [
@@ -108,10 +115,16 @@ def get_admin_inline_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="🔊 Тест: Сложное подземелье", callback_data="test_sound_dungeon_hard.mp3"),
         ],
         [
+            InlineKeyboardButton(text="🔊 Тест: Двойное подземелье", callback_data="test_sound_double_dungeon.mp3"),
+        ],
+        [
             InlineKeyboardButton(text="🔊 Тест: Остров Чеджу", callback_data="test_sound_jeju_raid.mp3"),
         ],
         [
             InlineKeyboardButton(text="🔊 Тест: Тёмный Аукцион", callback_data="test_sound_temnauc.mp3"),
+        ],
+        [
+            InlineKeyboardButton(text="🔊 Тест: Клановый рейд", callback_data="test_sound_clan.mp3"),
         ],
         [
             InlineKeyboardButton(text="🔊 Тест: Лололошка", callback_data="test_sound_lololoshka_online.mp3"),

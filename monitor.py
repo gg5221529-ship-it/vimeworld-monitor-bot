@@ -111,7 +111,26 @@ async def check_and_send_dungeon_alerts(bot: Bot):
                 for user_id in subscribers:
                     await safe_send_alert_message(bot, user_id, msg)
 
-    # 3. Jeju Island Raid Alert (Alert at 16:58 MSK - 2 min before 17:00 MSK)
+    # 3. Double Dungeon Alert (Starts at 00:00, 06:00, 12:00, 18:00 MSK -> Telegram Alert at :58)
+    if hour in (23, 5, 11, 17) and minute == 58:
+        next_hour = (hour + 1) % 24
+        start_time_str = f"{next_hour:02d}:00"
+        alert_key = ("dungeon_double_tg", now.date(), hour, minute)
+
+        if alert_key not in sent_dungeon_alerts:
+            sent_dungeon_alerts.add(alert_key)
+            
+            subscribers = await db.get_subscribers_for_player("dungeon_double")
+            if subscribers:
+                msg = (
+                    f"💀 <b>НАПОМИНАНИЕ О ДВОЙНОМ ПОДЗЕМЕЛЬЕ!</b> 💀\n\n"
+                    f"🚪 <b>Двойное подземелье</b> начнется через <b>2 минуты</b> (в <b>{start_time_str}</b>)!\n"
+                    f"⏰ Время МСК: <b>{now_str}</b>"
+                )
+                for user_id in subscribers:
+                    await safe_send_alert_message(bot, user_id, msg)
+
+    # 4. Jeju Island Raid Alert (Alert at 16:58 MSK - 2 min before 17:00 MSK)
     if hour == 16 and minute == 58:
         alert_key = ("dungeon_jeju", now.date(), hour, minute)
         
@@ -131,7 +150,7 @@ async def check_and_send_dungeon_alerts(bot: Bot):
                 for user_id in subscribers:
                     await safe_send_alert_message(bot, user_id, msg)
 
-    # 4. Dark Auction Alert (Alert on Saturday at 18:50 MSK - 10 min before 19:00 MSK)
+    # 5. Dark Auction Alert (Alert on Saturday at 18:50 MSK - 10 min before 19:00 MSK)
     if now.weekday() == 5 and hour == 18 and minute == 50:
         alert_key = ("dark_auction", now.date(), hour, minute)
         
@@ -151,13 +170,31 @@ async def check_and_send_dungeon_alerts(bot: Bot):
                 for user_id in subscribers:
                     await safe_send_alert_message(bot, user_id, msg)
 
-    # 5. Clan Raid Voice Alert (Alert 5 min before start at :55 of each hour) - Discord voice ONLY
-    sound_clan_enabled = await db.get_discord_setting("sound_clan_raid", 1)
-    if sound_clan_enabled and minute == 55:
-        alert_key = ("clan_raid", now.date(), hour, minute)
-        if alert_key not in sent_dungeon_alerts:
-            sent_dungeon_alerts.add(alert_key)
-            asyncio.create_task(discord_bot.play_voice_sound("clan.mp3"))
+    # 6. Hourly Voice Alert at :55 (Double Dungeon PRIORITY over Clan Raid)
+    if minute == 55:
+        is_double_dungeon_hour = hour in (23, 5, 11, 17)
+        
+        if is_double_dungeon_hour:
+            # PRIORITY: Double Dungeon Voice Alert in Discord (clan raid sound suppressed)
+            sound_double_enabled = await db.get_discord_setting("sound_dungeon_double", 1)
+            alert_key = ("dungeon_double_voice", now.date(), hour, minute)
+            
+            if alert_key not in sent_dungeon_alerts:
+                sent_dungeon_alerts.add(alert_key)
+                if sound_double_enabled:
+                    asyncio.create_task(discord_bot.play_voice_sound("double_dungeon.mp3"))
+                else:
+                    sound_clan_enabled = await db.get_discord_setting("sound_clan_raid", 1)
+                    if sound_clan_enabled:
+                        asyncio.create_task(discord_bot.play_voice_sound("clan.mp3"))
+        else:
+            # All other hours: Clan Raid Voice Alert
+            sound_clan_enabled = await db.get_discord_setting("sound_clan_raid", 1)
+            alert_key = ("clan_raid", now.date(), hour, minute)
+            if alert_key not in sent_dungeon_alerts:
+                sent_dungeon_alerts.add(alert_key)
+                if sound_clan_enabled:
+                    asyncio.create_task(discord_bot.play_voice_sound("clan.mp3"))
 
     # Clean old alert keys periodically
     if len(sent_dungeon_alerts) > 50:
