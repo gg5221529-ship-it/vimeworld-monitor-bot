@@ -1,4 +1,5 @@
 import math
+import time
 import aiohttp
 import logging
 from config import YOUTUBERS, CREATOR
@@ -149,6 +150,34 @@ async def fetch_player_status(nickname: str) -> dict:
             logger.warning(f"Error fetching user profile for {nickname}: {e}")
 
     return default_result
+
+
+# Cache for /online/staff lookups (ghost-session validation helper)
+_staff_online_cache = {"names": set(), "fetched_at": 0.0}
+STAFF_LIST_TTL_SECONDS = 10
+
+async def is_in_staff_online(nickname: str):
+    """
+    Live check whether a nickname is present in /online/staff (cached STAFF_LIST_TTL_SECONDS).
+    Returns True/False, or None when the endpoint is unreachable — callers should
+    treat None as "check failed" and NOT block the player state change.
+    """
+    now = time.time()
+    if now - _staff_online_cache["fetched_at"] > STAFF_LIST_TTL_SECONDS:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(STAFF_ONLINE_API_URL, timeout=4) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        _staff_online_cache["names"] = {s.get("username", "").lower() for s in data}
+                        _staff_online_cache["fetched_at"] = now
+                    else:
+                        logger.warning(f"/online/staff returned status {resp.status}")
+                        return None
+        except Exception as e:
+            logger.warning(f"Error fetching /online/staff: {e}")
+            return None
+    return nickname.lower() in _staff_online_cache["names"]
 
 
 async def fetch_full_player_profile(nickname: str) -> dict:
